@@ -144,7 +144,7 @@ class AiRecommendationController extends Controller
             ];
         });
 
-        // إرجاع النتيجة مع الإحصائيات والـ file_path
+        // إرجاع النتيجة مع الإحصائيات 
         return response()->json([
             'recommendations' => $requests
         ]);
