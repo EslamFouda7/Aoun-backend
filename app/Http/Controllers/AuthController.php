@@ -13,31 +13,38 @@ class AuthController extends Controller
  #------------------------------------------------------------------------------------------
 # login
 #---------------------------------------------------------------------------------------------
-    public function login(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
+public function login(Request $request)
+{
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required|string',
+    ]);
 
-        // التحقق من Donor
-        if (Auth::guard('donor')->attempt(['email' => $request->email, 'password' => $request->password])) {
-            $user = Auth::guard('donor')->user();
-            $token = $user->createToken('DonorToken')->plainTextToken;
-            return response()->json(['token' => $token, 'user_type' => 'donor'], 200);
-        }
-
-        // التحقق من Foundation
-        if (Auth::guard('foundation')->attempt(['email' => $request->email, 'password' => $request->password])) {
-            $user = Auth::guard('foundation')->user();
-            $token = $user->createToken('FoundationToken')->plainTextToken;
-            return response()->json(['token' => $token, 'user_type' => 'foundation'], 200);
-        }
-
-        // إذا فشل تسجيل الدخول
-        return response()->json(['error' => 'Unauthorized'], 401);
+    // التحقق من Donor
+    if (Auth::guard('donor')->attempt(['email' => $request->email, 'password' => $request->password])) {
+        $user = Auth::guard('donor')->user();
+        $token = $user->createToken('DonorToken')->plainTextToken;
+        return response()->json([
+            'token' => $token,
+            'user_type' => 'donor',
+            'user_id' => $user->id,
+        ], 200);
     }
-    
+
+    // التحقق من Foundation
+    if (Auth::guard('foundation')->attempt(['email' => $request->email, 'password' => $request->password])) {
+        $user = Auth::guard('foundation')->user();
+        $token = $user->createToken('FoundationToken')->plainTextToken;
+        return response()->json([
+            'token' => $token,
+            'user_type' => 'foundation',
+            'user_id' => $user->id,
+        ], 200);
+    }
+
+    return response()->json(['error' => 'User not found'], 401);
+}
+
      #------------------------------------------------------------------------------------------
     # logout
     #---------------------------------------------------------------------------------------------
@@ -46,19 +53,19 @@ class AuthController extends Controller
         $user = Auth::guard('donor')->user();
 
         if ($user) {
-            $user->tokens()->delete(); // حذف جميع Tokens الخاصة بالمستخدم
+            $user->tokens()->delete(); 
             return response()->json(['message' => 'Donor logged out successfully'], 200);
         }
 
         return response()->json(['error' => 'Unauthorized'], 401);
     }
-   
+
     public function logoutFoundation(Request $request)
     {
         $user = Auth::guard('foundation')->user();
 
         if ($user) {
-            $user->tokens()->delete(); // حذف جميع Tokens الخاصة بالمستخدم
+            $user->tokens()->delete(); 
             return response()->json(['message' => 'Foundation logged out successfully'], 200);
         }
 
@@ -69,62 +76,79 @@ class AuthController extends Controller
     #update pasword
     #----------------------------------------------------------------------------------------
     public function updatePassword(Request $request)
-{
-    $request->validate([
-        'email' => 'required|email',
-        'current_password' => 'required|string',
-        'new_password' => 'required|string|confirmed',
-    ]);
+    {
+        $request->validate([
+            'user_id' => 'required|integer', 
+            'user_type' => 'required|string',
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|confirmed',
+        ]);
 
-    // البحث عن المستخدم سواء كان Donor أو Foundation
-    $donor = Donor::where('email', $request->email)->first();
-    $foundation = Foundation::where('email', $request->email)->first();
+        if ($request->user_type === 'donor') {
+            $user = Donor::find($request->user_id);
+        } else {
+            $user = Foundation::find($request->user_id);
+        }
 
-    $user = $donor ?? $foundation;
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
 
-    if (!$user) {
-        return response()->json(['message' => 'User not found'], 404);
+        // التحقق من كلمة المرور الحالية
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json(['message' => 'Old password is incorrect'], 401);
+        }
+
+        // تحديث كلمة المرور الجديدة
+        $user->password = Hash::make($request->new_password);
+        $user->save();
+
+        return response()->json(['message' => 'Password updated successfully']);
     }
 
-    // التحقق من كلمة المرور الحالية
-    if (!Hash::check($request->current_password, $user->password)) {
-        return response()->json(['message' => 'Current password is incorrect'], 401);
-    }
-
-    // تحديث كلمة المرور الجديدة
-    $user->password = Hash::make($request->new_password);
-    $user->save();
-
-    return response()->json(['message' => 'Password updated successfully']);
-}
  #------------------------------------------------------------------------------------------
  # update profile
 #---------------------------------------------------------------------------------------------
 public function updateProfile(Request $request)
 {
     $request->validate([
-        'user_type' => 'required|in:donor,foundation', // تحديد نوع المستخدم
-        'email' => 'required|email', // البريد الإلكتروني لتحديد المستخدم
-        'full_name' => 'sometimes|string|max:255', // للمتبرع
-        'foundation_name' => 'sometimes|string|max:255', // للمؤسسة
+        'user_id' => 'required|integer', 
+        'user_type' => 'required|in:donor,foundation',
+        'email' => 'sometimes|email', 
+        'full_name' => 'sometimes|string|max:255',
+        'foundation_name' => 'sometimes|string|max:255',
         'phone' => 'sometimes|string',
-        'preferred_donation' => 'sometimes|string', // للمتبرع
-        'required_donation' => 'sometimes|string', // للمؤسسة
+        'preferred_donation' => 'sometimes|string',
+        'required_donation' => 'sometimes|string',
         'location' => 'sometimes|string',
     ]);
 
-    // تحديد نوع المستخدم
     if ($request->user_type === 'donor') {
-        $user = Donor::where('email', $request->email)->first();
+        $user = Donor::find($request->user_id);
     } else {
-        $user = Foundation::where('email', $request->email)->first();
+        $user = Foundation::find($request->user_id);
     }
 
     if (!$user) {
         return response()->json(['message' => 'User not found'], 404);
     }
 
-    // تحديث البيانات
+    if ($request->has('email')) {
+        $emailExistsInDonors = Donor::where('email', $request->email)
+            ->where('id', '!=', $request->user_id)
+            ->exists();
+
+        $emailExistsInFoundations = Foundation::where('email', $request->email)
+            ->where('id', '!=', $request->user_id)  
+            ->exists();
+
+        if ($emailExistsInDonors || $emailExistsInFoundations) {
+            return response()->json(['message' => 'Email is already in use by another user'], 400);
+        }
+
+        $user->email = $request->email;
+    }
+
     if ($request->has('full_name')) {
         $user->full_name = $request->full_name;
     }
@@ -156,12 +180,12 @@ public function updateProfile(Request $request)
 #------------------------------------------------------------------------------------------------
 public function getAllFoundations()
 {
-    $foundations = Foundation::all();  
+    $foundations = Foundation::all();
     return response()->json(['message' => 'Foundations retrieved successfully', 'data' => $foundations]);
 }
 public function getAllDonors()
 {
-    $donors = Donor::all();  
+    $donors = Donor::all();
     return response()->json(['message' => 'Donors retrieved successfully', 'data' => $donors]);
 }
 }

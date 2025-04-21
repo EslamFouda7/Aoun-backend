@@ -12,6 +12,7 @@ class DonationRequest extends Model
         'title',
         'description',
         'location',
+        'reqiured_donation',
         'required_amount',
         'file_path',
     ];
@@ -21,4 +22,10 @@ class DonationRequest extends Model
     {
         return $this->belongsTo(Foundation::class);
     }
+    public function donations()
+{
+    return $this->hasMany(Donation::class);
+}
+
+
 }

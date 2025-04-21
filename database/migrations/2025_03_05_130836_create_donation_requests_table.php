@@ -14,6 +14,7 @@ return new class extends Migration
         $table->string('title');
         $table->text('description');
         $table->string('location');
+        $table->string('reqiured_donation');
         $table->decimal('required_amount', 10, 2);
         $table->string('file_path')->nullable(); 
         $table->timestamps();

@@ -40,4 +40,26 @@ return [
         'model' => App\Models\Foundation::class, // تأكد من أن النموذج موجود
     ],
 ],
+#-------------------------------------------------------------------------------
+'passwords' => [
+    'users' => [
+        'provider' => 'users',
+        'table' => 'password_reset_tokens',
+        'expire' => 60,
+        'throttle' => 60,
+    ],
+    'donors' => [
+        'provider' => 'donors',
+        'table' => 'password_reset_tokens',
+        'expire' => 60,
+        'throttle' => 60,
+    ],
+    'foundations' => [
+        'provider' => 'foundations',
+        'table' => 'password_reset_tokens',
+        'expire' => 60,
+        'throttle' => 60,
+    ],
+],
+
 ];
