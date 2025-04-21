@@ -126,7 +126,7 @@ class AiRecommendationController extends Controller
                 'id' => $request->id,
                 'title' => $request->title,
                 'description' => $request->description,
-                'required_donation' => $request->reqiured_donation, // تأكد من صحة التسمية
+                'required_donation' => $request->reqiured_donation, 
                 'required_amount' => $request->required_amount,
                 'file_path' => $request->file_path,
                 'location' => $request->location,
@@ -144,7 +144,7 @@ class AiRecommendationController extends Controller
             ];
         });
 
-        // إرجاع النتيجة مع الإحصائيات 
+        // إرجاع النتيجة مع الإحصائيات
         return response()->json([
             'recommendations' => $requests
         ]);
