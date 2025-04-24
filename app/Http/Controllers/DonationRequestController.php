@@ -88,58 +88,62 @@ class DonationRequestController extends Controller
         }
 
         $donationRequest->update($request->only([
-            'title', 'description', 'reqiured_donation', 'location', 'required_amount'
+            'title',
+            'description',
+            'reqiured_donation',
+            'location',
+            'required_amount'
         ]));
 
         return response()->json(['message' => 'Donation request updated successfully', 'data' => $donationRequest]);
     }
 
 
-#------------------------------------------------------------
+    #------------------------------------------------------------
     # get all Request
     #-------------------------------------------------------------
     public function GetAllrequest()
-{
-    $donationRequests = DonationRequest::with(['donations', 'foundation:id,foundation_name'])->get();
+    {
+        $donationRequests = DonationRequest::with(['donations', 'foundation:id,foundation_name'])->get();
 
-    if ($donationRequests->isEmpty()) {
-        return response()->json(['message' => 'No donation requests found'], 404);
+        if ($donationRequests->isEmpty()) {
+            return response()->json(['message' => 'No donation requests found'], 404);
+        }
+
+        $formattedRequests = $donationRequests->map(function ($request) {
+            $totalDonated = $request->donations->sum('amount');
+            $remainingAmount = $request->required_amount - $totalDonated;
+            $percentage = $request->required_amount > 0
+                ? round(($totalDonated / $request->required_amount) * 100) : 0;
+
+            return [
+                'id' => $request->id,
+                'title' => $request->title,
+                'description' => $request->description,
+                'required_donation' => $request->reqiured_donation,
+                'required_amount' => $request->required_amount,
+                'foundation_id' => $request->foundation_id,
+                'file_path' => $request->file_path,
+                'location' => $request->location,
+                'created_at' => $request->created_at,
+                'updated_at' => $request->updated_at,
+                'stats' => [
+                    'total_donated' => $totalDonated,
+                    'remaining_amount' => $remainingAmount,
+                    'percentage_completed' => $percentage,
+                ],
+                'foundation' => $request->foundation ? [
+                    'id' => $request->foundation->id,
+                    'foundation_name' => $request->foundation->foundation_name,
+                ] : null,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $formattedRequests
+        ]);
     }
-
-    $formattedRequests = $donationRequests->map(function ($request) {
-        $totalDonated = $request->donations->sum('amount');
-        $remainingAmount = $request->required_amount - $totalDonated;
-        $percentage = $request->required_amount > 0
-            ? round(($totalDonated / $request->required_amount) * 100) : 0;
-
-        return [
-            'id' => $request->id,
-            'title' => $request->title,
-            'description' => $request->description,
-            'required_donation' => $request->reqiured_donation,
-            'required_amount' => $request->required_amount,
-            'foundation_id' => $request->foundation_id,
-            'file_path' => $request->file_path,
-            'location' => $request->location,
-            'created_at' => $request->created_at,
-            'updated_at' => $request->updated_at,
-            'stats' => [
-                'total_donated' => $totalDonated,
-                'remaining_amount' => $remainingAmount,
-                'percentage_completed' => $percentage,
-            ],
-            'foundation' => $request->foundation ? [
-                'id' => $request->foundation->id,
-                'foundation_name' => $request->foundation->foundation_name,
-            ] : null,
-        ];
-    });
-
-    return response()->json([
-        'status' => 'success',
-        'data' => $formattedRequests
-    ]);
-}
 
 
     #-----------------------------------------------------------
@@ -176,7 +180,7 @@ class DonationRequestController extends Controller
                 ? round(($totalDonated / $request->required_amount) * 100) : 0;
 
 
-return [
+            return [
                 'id' => $request->id,
                 'title' => $request->title,
                 'description' => $request->description,
@@ -202,6 +206,22 @@ return [
         return response()->json([
             'status' => 'success',
             'data' => $staterequest
+        ]);
+    }
+
+    #getRequestsByLocation
+    public function getRequestsByLocation()
+    {
+        $totalRequests = DonationRequest::count();
+        $requestsByLocation = DonationRequest::selectRaw('location, COUNT(*) as requests_count')
+            ->groupBy('location')->get()
+            ->map(function ($item) use ($totalRequests) {
+                $item->percentage = round(($item->requests_count / $totalRequests) * 100, 2);
+                return $item;
+            });
+        return response()->json([
+            'success' => true,
+            'data' => $requestsByLocation
         ]);
     }
 }

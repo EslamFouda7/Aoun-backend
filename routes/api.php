@@ -41,7 +41,7 @@ Route::get('/donation-requests/{id}', [DonationRequestController::class, 'ShowOn
 #---------------------------------------------------------------------------------------
 Route::get('/foundations/{foundationId}/donation-requests', [DonationRequestController::class, 'getRequestsByFoundationId']);
 #--------------------------------------------------------------------------------------------
-#دا بيخزن الدفع 
+#دا بيخزن الدفع
 Route::post('/donations', [DonationController::class, 'store']);
 #---------------------------------------------------------------------------------------------------
 #دابيعرض بيانات تبرع معين
@@ -53,7 +53,10 @@ Route::get('/donations/request/{requestId}/stats', [DonationController::class, '
 #دا بيعرض تبرعات متبرع معين
 Route::get('/donations/donor/{donorId}', [DonationController::class, 'getDonorDonations']);
 #----------------------------------------------------------------------------------------------------
-# دا رابط المودل 
+# دا رابط المودل
 Route::get('/ai/recommend/{donorId}', [AiRecommendationController::class, 'recommendations_Ai']);
 
+#----------------------------------------------
+#---------بيجيب الطلبات على حسب الموقع-------
+Route::get('/requests/by-location', [DonationRequestController::class, 'getRequestsByLocation']);
 
