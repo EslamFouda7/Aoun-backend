@@ -135,20 +135,47 @@ class DonationController extends Controller
      */
     public function getDonorDonations($donorId)
     {
-        $donor = Donor::with('donations.donationRequest')->find($donorId);
+    $donor = Donor::with('donations.donationRequest.donations')->find($donorId);
 
-        if (!$donor) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Donor not found'
-            ], 404);
-        }
-
+    if (!$donor)
+    {
         return response()->json([
-            'status' => 'success',
-            'data' => $donor->donations
-        ]);
+            'status' => 'error',
+            'message' => 'Donor not found'
+        ], 404);
     }
+        $donations = $donor->donations->map(function ($donation)
+         {
+        $donationRequest = $donation->donationRequest;
+        if ($donationRequest)
+        {
+            $totalDonated = $donationRequest->donations->sum('amount');
+            $remainingAmount = $donationRequest->required_amount - $totalDonated;
+            $percentage = $donationRequest->required_amount > 0
+            ? round(($totalDonated / $donationRequest->required_amount) * 100) : 0;
+        }
+        else
+         {
+            $totalDonated = $remainingAmount = $percentage = null;
+         }
+
+        return [
+            'donation' => $donation,
+            'status' =>
+            [
+                'total_required' => $donationRequest->required_amount ?? null,
+                'total_donated' => $totalDonated,
+                'remaining_amount' => $remainingAmount,
+                'percentage_completed' => $percentage
+            ]
+        ];
+    });
+
+    return response()->json([
+        'status' => 'success',
+        'data' => $donations
+    ]);
+}
     #--------------------------------------------------------------
 
 }
