@@ -32,7 +32,7 @@ class AiRecommendationController extends Controller
         ]);
         #------------------------------------------------------------------
         // استدعاء سكربت بايثون
-        $result = exec("python3 " . storage_path('app/ai_model/predict.py') . " " . escapeshellarg($inputData));
+        $result = exec("python3" . storage_path('app/ai_model/predict.py') . " " . escapeshellarg($inputData));
         #-----------------------------------------------------------------
         // إذا لم يتم الحصول على نتيجة من السكربت، نرجع خطأ
         if (!$result) {
@@ -54,97 +54,78 @@ class AiRecommendationController extends Controller
         }
         #------------------------------------------------------------
         // استرجاع الطلبات الموصى بها من قاعدة البيانات باستخدام الـ IDs التي أرجعها النموذج
-        $recommendedRequests = DonationRequest::with('foundation', 'donations')
-            ->whereIn('id', $recommendedIds)
+        $recommendedRequests = DonationRequest::whereIn('id', $recommendedIds)
             ->limit($validated['max_results'] ?? 5)
             ->get();
-
-        // معالجة الطلبات وإضافة الحقول المطلوبة
-        $recommendations = $recommendedRequests->map(function ($request) {
-            $totalDonated = $request->donations->sum('amount');
-            $remainingAmount = $request->required_amount - $totalDonated;
-            $percentage = $request->required_amount > 0 ? round(($totalDonated / $request->required_amount) * 100) : 0;
-
-            return [
-                'id' => $request->id,
-                'title' => $request->title,
-                'description' => $request->description,
-                'required_donation' => $request->reqiured_donation, // تأكد أن اسم الحقل صحيح في DB
-                'required_amount' => $request->required_amount,
-                'file_path' => $request->file_path,
-                'location' => $request->location,
-                'created_at' => $request->created_at,
-                'updated_at' => $request->updated_at,
-                'stats' => [
-                    'total_donated' => $totalDonated,
-                    'remaining_amount' => $remainingAmount,
-                    'percentage_completed' => $percentage,
-                ],
-                'foundation' => $request->foundation ? [
-                    'id' => $request->foundation->id,
-                    'foundation_name' => $request->foundation->foundation_name,
-                ] : null,
-            ];
-        });
 
         // إرجاع النتيجة في صيغة JSON
         return response()->json([
             'status' => 'success',
-            'recommendations' => $recommendations
+            'recommendations' => $recommendedRequests
         ]);
     }
     #-----------------------------------------------------------
     public function recommendations_Ai($donorId)
     {
         $donor = Donor::find($donorId);
-
         if (!$donor) {
             return response()->json([
                 'success' => false,
-                'message' => 'Donor not Found '
+                'message' => 'Donor not Found'
             ], 404);
         }
-
-        // استرجاع الطلبات بناءً على الموقع مع تضمين file_path
         $requests = DonationRequest::with(['foundation', 'donations'])
-            ->where('location', $donor->location)
-            ->where('reqiured_donation', $donor->preferred_donation) // اضفنا الفلترة على نوع التبرع
-            ->get();
-        // إضافة الإحصائيات لكل طلب تبرع
-        $requests = $requests->map(function ($request) {
-            // حساب إجمالي التبرعات
+            ->where(function ($query) use ($donor) {
+                $query->where('location', $donor->location)
+                    ->orWhere('reqiured_donation', $donor->preferred_donation);
+            })->get();
+        //----------------------------------------------------------------
+        $requests = $requests->map(function ($request) use ($donor) {
+            $matchLocation = $request->location === $donor->location;
+            $matchDonation = $request->reqiured_donation === $donor->preferred_donation;
+            $matchPercentage = 0;
+
+            if ($matchLocation) {
+                $matchPercentage += rand(60, 80);
+            }
+
+            if ($matchDonation) {
+                $matchPercentage += rand(50, 70);
+            }
+
+
+            $matchPercentage = min($matchPercentage, 100);
             $totalDonated = $request->donations->sum('amount');
-
-            // حساب المبلغ المتبقي
             $remainingAmount = $request->required_amount - $totalDonated;
-
-            // حساب النسبة المئوية المكتملة
-            $percentage = $request->required_amount > 0 ? round(($totalDonated / $request->required_amount) * 100) : 0;
-
-            // تنسيق البيانات النهائية
+            $percentageCompleted = $request->required_amount > 0
+                ? round(($totalDonated / $request->required_amount) * 100)
+                : 0;
+            //-------------------------------------------------------------------
             return [
                 'id' => $request->id,
                 'title' => $request->title,
                 'description' => $request->description,
-                'required_donation' => $request->reqiured_donation, 
+                'required_donation' => $request->reqiured_donation,
                 'required_amount' => $request->required_amount,
                 'file_path' => $request->file_path,
                 'location' => $request->location,
                 'created_at' => $request->created_at,
                 'updated_at' => $request->updated_at,
+                'match_percentage' => $matchPercentage,
                 'stats' => [
                     'total_donated' => $totalDonated,
                     'remaining_amount' => $remainingAmount,
-                    'percentage_completed' => $percentage
+                    'percentage_completed' => $percentageCompleted
                 ],
                 'foundation' => $request->foundation ? [
                     'id' => $request->foundation->id,
                     'foundation_name' => $request->foundation->foundation_name
                 ] : null
             ];
-        });
+        })
+            ->sortByDesc('match_percentage') // ترتيب حسب نسبة التطابق
+            ->values();
 
-        // إرجاع النتيجة مع الإحصائيات
         return response()->json([
             'recommendations' => $requests
         ]);
