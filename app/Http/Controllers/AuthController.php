@@ -218,7 +218,7 @@ public function forgotPassword(Request $request)
     // Send email with token
     Mail::to($user->email)->send(new ResetPasswordMail($token, $user->email));
 
-    return response()->json(['message' => 'Reset link sent to your email.']);
+    return response()->json(['message' => 'Chick your email!! Reset link sent to your email.']);
 }
 
 
