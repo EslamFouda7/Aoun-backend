@@ -229,7 +229,7 @@ public function resetPassword(Request $request)
     $request->validate([
         'email' => 'required|email',
         'token' => 'required',
-        'password' => 'required|string|confirmed',
+        'password' => 'required|string|min:8|confirmed', // إضافة التحقق من الطول
     ]);
 
     $reset = DB::table('password_reset_tokens')
