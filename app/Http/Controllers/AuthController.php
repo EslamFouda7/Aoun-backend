@@ -6,7 +6,10 @@ use Illuminate\Auth\RequestGuard;
 use App\Models\Donor;
 use App\Models\Foundation;
 use Illuminate\Support\Facades\Hash;
-
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\ResetPasswordMail;
 
 class AuthController extends Controller
 {
@@ -53,7 +56,7 @@ public function login(Request $request)
         $user = Auth::guard('donor')->user();
 
         if ($user) {
-            $user->tokens()->delete(); 
+            $user->tokens()->delete();
             return response()->json(['message' => 'Donor logged out successfully'], 200);
         }
 
@@ -65,7 +68,7 @@ public function login(Request $request)
         $user = Auth::guard('foundation')->user();
 
         if ($user) {
-            $user->tokens()->delete(); 
+            $user->tokens()->delete();
             return response()->json(['message' => 'Foundation logged out successfully'], 200);
         }
 
@@ -78,7 +81,7 @@ public function login(Request $request)
     public function updatePassword(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|integer', 
+            'user_id' => 'required|integer',
             'user_type' => 'required|string',
             'current_password' => 'required|string',
             'new_password' => 'required|string|confirmed',
@@ -112,9 +115,9 @@ public function login(Request $request)
 public function updateProfile(Request $request)
 {
     $request->validate([
-        'user_id' => 'required|integer', 
+        'user_id' => 'required|integer',
         'user_type' => 'required|in:donor,foundation',
-        'email' => 'sometimes|email', 
+        'email' => 'sometimes|email',
         'full_name' => 'sometimes|string|max:255',
         'foundation_name' => 'sometimes|string|max:255',
         'phone' => 'sometimes|string',
@@ -139,7 +142,7 @@ public function updateProfile(Request $request)
             ->exists();
 
         $emailExistsInFoundations = Foundation::where('email', $request->email)
-            ->where('id', '!=', $request->user_id)  
+            ->where('id', '!=', $request->user_id)
             ->exists();
 
         if ($emailExistsInDonors || $emailExistsInFoundations) {
@@ -187,5 +190,68 @@ public function getAllDonors()
 {
     $donors = Donor::all();
     return response()->json(['message' => 'Donors retrieved successfully', 'data' => $donors]);
+}
+
+public function forgotPassword(Request $request)
+{
+    $request->validate([
+        'email' => 'required|email',
+    ]);
+
+    $user = Donor::where('email', $request->email)->first()
+        ?? Foundation::where('email', $request->email)->first();
+
+    if (!$user) {
+        return response()->json(['message' => 'No user found with this email'], 404);
+    }
+
+    $token = Str::random(64);
+
+    DB::table('password_reset_tokens')->updateOrInsert(
+        ['email' => $request->email],
+        [
+            'token' => Hash::make($token),
+            'created_at' => now(),
+        ]
+    );
+
+    // Send email with token
+    Mail::to($user->email)->send(new ResetPasswordMail($token, $user->email));
+
+    return response()->json(['message' => 'Reset link sent to your email.']);
+}
+
+
+// ------------------------------------------------------------
+
+public function resetPassword(Request $request)
+{
+    $request->validate([
+        'email' => 'required|email',
+        'token' => 'required',
+        'password' => 'required|string|confirmed',
+    ]);
+
+    $reset = DB::table('password_reset_tokens')
+        ->where('email', $request->email)
+        ->first();
+
+    if (!$reset || !Hash::check($request->token, $reset->token)) {
+        return response()->json(['message' => 'Invalid token'], 400);
+    }
+
+    $user = Donor::where('email', $request->email)->first()
+        ?? Foundation::where('email', $request->email)->first();
+
+    if (!$user) {
+        return response()->json(['message' => 'User not found'], 404);
+    }
+
+    $user->password = Hash::make($request->password);
+    $user->save();
+
+    DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+    return response()->json(['message' => 'Password has been reset successfully']);
 }
 }

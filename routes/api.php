@@ -60,3 +60,5 @@ Route::get('/ai/recommend/{donorId}', [AiRecommendationController::class, 'recom
 #---------بيجيب الطلبات على حسب الموقع-------
 Route::get('/requests/by-location', [DonationRequestController::class, 'getRequestsByLocation']);
 
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
